@@ -303,7 +303,6 @@
         );
         
         let alarmData = [];
-        let latestData = null;
         
         function fetchAlarmData() {
             database.ref('alarme').orderByKey().limitToLast(10).once('value')
@@ -311,7 +310,7 @@
                     alarmData = [];
                     snapshot.forEach(childSnapshot => {
                         const data = childSnapshot.val();
-                        alarmData.unshift({
+                        alarmData.push({
                             key: childSnapshot.key,
                             timestamp: data.timestamp,
                             distance: data.distance,
@@ -334,7 +333,9 @@
                 return;
             }
             
-            alarmData.forEach(item => {
+            const reversedData = [...alarmData].reverse();
+            
+            reversedData.forEach(item => {
                 const row = document.createElement('tr');
                 
                 const timestampCell = document.createElement('td');
@@ -375,7 +376,7 @@
         
         database.ref('alarme').limitToLast(1).on('child_added', snapshot => {
             const data = snapshot.val();
-            alarmData.unshift({
+            alarmData.push({
                 key: snapshot.key,
                 timestamp: data.timestamp,
                 distance: data.distance,
@@ -383,7 +384,7 @@
             });
             
             if (alarmData.length > 10) {
-                alarmData.pop();
+                alarmData.shift();
             }
             
             updateAlertsTable();
