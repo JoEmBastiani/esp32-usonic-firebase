@@ -219,7 +219,7 @@
         
         <div class="dashboard">
             <div class="card">
-                <h2>Distance History</h2>
+                <h2>Alarm History</h2>
                 <div class="chart-container">
                     <canvas id="distanceChart"></canvas>
                 </div>
@@ -253,22 +253,18 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Firebase configuration
         const firebaseConfig = {
             databaseURL: "https://esp32-iot-77acf-default-rtdb.firebaseio.com/"
         };
         
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
         
-        // DOM elements
         const currentDistanceElement = document.getElementById('current-distance');
         const currentDifferenceElement = document.getElementById('current-difference');
         const alarmStatusElement = document.getElementById('alarm-status');
         const alertsTableElement = document.getElementById('alerts-table');
         
-        // Chart setup
         const distanceChart = new Chart(
             document.getElementById('distanceChart'),
             {
@@ -306,11 +302,9 @@
             }
         );
         
-        // Variables to store data
         let alarmData = [];
         let latestData = null;
         
-        // Fetch initial alarm data
         function fetchAlarmData() {
             database.ref('alarme').orderByKey().limitToLast(10).once('value')
                 .then(snapshot => {
@@ -325,13 +319,13 @@
                         });
                     });
                     updateAlertsTable();
+                    updateChart();
                 })
                 .catch(error => {
                     console.error('Error fetching alarm data:', error);
                 });
         }
         
-        // Update alerts table
         function updateAlertsTable() {
             alertsTableElement.innerHTML = '';
             
@@ -364,7 +358,21 @@
             });
         }
         
-        // Listen for new alarm data
+        function updateChart() {
+            distanceChart.data.labels = [];
+            distanceChart.data.datasets[0].data = [];
+            distanceChart.data.datasets[1].data = [];
+            
+            alarmData.forEach(item => {
+                const timeLabel = item.timestamp.split(' ')[1];
+                distanceChart.data.labels.push(timeLabel);
+                distanceChart.data.datasets[0].data.push(item.distance);
+                distanceChart.data.datasets[1].data.push(item.difference);
+            });
+            
+            distanceChart.update();
+        }
+        
         database.ref('alarme').limitToLast(1).on('child_added', snapshot => {
             const data = snapshot.val();
             alarmData.unshift({
@@ -374,56 +382,24 @@
                 difference: data.difference
             });
             
-            // Keep only the last 10 entries
             if (alarmData.length > 10) {
                 alarmData.pop();
             }
             
             updateAlertsTable();
+            updateChart();
             
-            // Update alarm status
+            currentDistanceElement.textContent = `${data.distance} cm`;
+            currentDifferenceElement.textContent = `${data.difference} cm`;
+            
             if (Math.abs(data.difference) > 1 && data.distance < 50) {
                 alarmStatusElement.textContent = 'ACTIVE';
                 alarmStatusElement.className = 'alarm-status alarm-active';
             }
         });
         
-        // Update UI with latest data
-        function updateUI() {
-            if (latestData) {
-                currentDistanceElement.textContent = `${latestData.distance} cm`;
-                currentDifferenceElement.textContent = `${latestData.difference} cm`;
-                
-                // Update chart
-                const timeLabel = latestData.timestamp.split(' ')[1]; // Get time part only
-                distanceChart.data.labels.push(timeLabel);
-                distanceChart.data.datasets[0].data.push(latestData.distance);
-                distanceChart.data.datasets[1].data.push(latestData.difference);
-                
-                // Keep only last 20 data points
-                if (distanceChart.data.labels.length > 20) {
-                    distanceChart.data.labels.shift();
-                    distanceChart.data.datasets[0].data.shift();
-                    distanceChart.data.datasets[1].data.shift();
-                }
-                
-                distanceChart.update();
-            }
-        }
-        
-        // Simulate receiving data (in a real scenario, this would come from Firebase)
-        // For demonstration, we'll use the alarm data to simulate updates
-        setInterval(() => {
-            if (alarmData.length > 0) {
-                latestData = alarmData[0];
-                updateUI();
-            }
-        }, 2000);
-        
-        // Initialize
         fetchAlarmData();
         
-        // Reset alarm status after 5 seconds if no new alarms
         setInterval(() => {
             alarmStatusElement.textContent = 'INACTIVE';
             alarmStatusElement.className = 'alarm-status alarm-inactive';
